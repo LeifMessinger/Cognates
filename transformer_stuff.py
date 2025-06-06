@@ -53,7 +53,7 @@ class TransformerCognateModel(nn.Module):
         dropout = .2
         self.pos_encoder = PositionalEncoding(embedding_dim, dropout)
         encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=4)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2) #I assume is_causal=False. It throws an error if I try to set it.
 
         # Fixed: Use embedding_dim instead of hidden_dim for the input size
         self.fc = nn.Sequential(
@@ -98,7 +98,8 @@ class TransformerCognateModel(nn.Module):
     def forward(self, input1, input2):
         enc1 = self.encode_word(input1)  # [batch_size, embedding_dim]
         enc2 = self.encode_word(input2)  # [batch_size, embedding_dim]
-        combined = torch.cat([enc1, enc2], dim=1)  # [batch_size, embedding_dim * 2]
+        import random
+        combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
         return self.fc(combined)  # [batch_size, 1]
 
 class UnbatchedWrapper(nn.Module):
