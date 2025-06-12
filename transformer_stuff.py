@@ -52,16 +52,18 @@ class TransformerCognateModel(nn.Module):
 
         dropout = .2
         self.pos_encoder = PositionalEncoding(embedding_dim, dropout)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=4)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=4, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2) #I assume is_causal=False. It throws an error if I try to set it.
 
-        # Fixed: Use embedding_dim instead of hidden_dim for the input size
+
         self.fc = nn.Sequential(
             nn.Linear(embedding_dim * 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
             nn.ReLU(),
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
+
+        #self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def encode_word(self, x):
         # Debug: Print input shape
@@ -80,17 +82,14 @@ class TransformerCognateModel(nn.Module):
         x = self.embedding(x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After embedding shape: {x.shape}")
         
-        x = x.transpose(0, 1)  # [seq_len, batch_size, embedding_dim] (required for transformer)
-        #print(f"After transpose shape: {x.shape}")
-        
-        pos_encoded_x = self.pos_encoder(x)  # [seq_len, batch_size, embedding_dim]
+        pos_encoded_x = self.pos_encoder(x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After pos encoding shape: {pos_encoded_x.shape}")
         
-        encoded = self.transformer_encoder(pos_encoded_x)  # [seq_len, batch_size, embedding_dim]
+        encoded = self.transformer_encoder(pos_encoded_x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After transformer shape: {encoded.shape}")
         
         # Option 1: Use mean pooling to get a fixed-size representation
-        return encoded.mean(dim=0)  # [batch_size, embedding_dim]
+        return encoded.mean(dim=1)  # [batch_size, embedding_dim]
         
         # Option 2: Use the last token (uncomment if preferred)
         # return encoded[-1]  # [batch_size, embedding_dim]
@@ -98,9 +97,15 @@ class TransformerCognateModel(nn.Module):
     def forward(self, input1, input2):
         enc1 = self.encode_word(input1)  # [batch_size, embedding_dim]
         enc2 = self.encode_word(input2)  # [batch_size, embedding_dim]
+        
+        # Compute cosine similarity
+        #similarity = self.cosine_similarity(enc1, enc2)
+
+        #similarity = torch.norm(enc1 - enc2, dim=1)
         import random
         combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
-        return self.fc(combined)  # [batch_size, 1]
+
+        return self.fc(combined) #torch.sigmoid(similarity)
 
 class UnbatchedWrapper(nn.Module):
     """
