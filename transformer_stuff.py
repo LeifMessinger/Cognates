@@ -55,7 +55,6 @@ class TransformerCognateModel(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=4, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2) #I assume is_causal=False. It throws an error if I try to set it.
 
-
         self.fc = nn.Sequential(
             nn.Linear(embedding_dim * 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
             nn.ReLU(),
@@ -63,7 +62,8 @@ class TransformerCognateModel(nn.Module):
             nn.Sigmoid()
         )
 
-        #self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        self.use_cosine_similarity = False
+        self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
 
     def encode_word(self, x):
         # Debug: Print input shape
@@ -99,13 +99,19 @@ class TransformerCognateModel(nn.Module):
         enc2 = self.encode_word(input2)  # [batch_size, embedding_dim]
         
         # Compute cosine similarity
-        #similarity = self.cosine_similarity(enc1, enc2)
 
         #similarity = torch.norm(enc1 - enc2, dim=1)
+        #import random
+        #combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
+
+        if self.use_cosine_similarity:
+            similarity = self.cosine_similarity(enc1, enc2)
+            return torch.sigmoid(similarity)
+        
+        similarity = torch.norm(enc1 - enc2, dim=1)
         import random
         combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
-
-        return self.fc(combined) #torch.sigmoid(similarity)
+        return self.fc(combined)
 
 class UnbatchedWrapper(nn.Module):
     """
