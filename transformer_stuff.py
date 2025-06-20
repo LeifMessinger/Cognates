@@ -108,7 +108,8 @@ class TransformerCognateModel(nn.Module):
             similarity = self.cosine_similarity(enc1, enc2)
             return torch.sigmoid(similarity)
         
-        similarity = torch.norm(enc1 - enc2, dim=1)
+        #similarity = torch.norm(enc1 - enc2, dim=1)
+        
         import random
         combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
         return self.fc(combined)
