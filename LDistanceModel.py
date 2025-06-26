@@ -189,9 +189,10 @@ class LDistanceModel(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1, mask_check=True) #mask_check makes sure we're only masking off the padding
 
         self.fc = nn.Sequential(
-            nn.Linear(embedding.embedding_dim + 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
-            nn.ReLU(),
-            nn.Linear(64, 1),
+            nn.Linear(embedding.embedding_dim + 2, 1),  # Changed from hidden_dim * 2 to embedding_dim * 2
+            #nn.Linear(embedding.embedding_dim + 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
+            #nn.ReLU(),
+            #nn.Linear(64, 1),
             nn.Sigmoid()
         )
 
