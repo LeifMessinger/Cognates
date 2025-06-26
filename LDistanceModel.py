@@ -1,3 +1,16 @@
+class SetEmbedding:
+    def __init__(self, set_of_things, embedding_dim):
+        import torch
+        import torch.nn as nn
+        self.embedding_dim = embedding_dim
+        self.embedding = nn.Embedding(len(set_of_things), embedding_dim, padding_idx=0, _freeze=True)
+
+        self.ids = {thing: torch.tensor([idx]) for idx, thing in enumerate(set_of_things)}
+
+    def __call__(self, character):
+        # This is a dummy embedding; replace with your actual embedding function
+        return self.embedding(self.ids[character])
+
 def ldistance(str1, str2):
     # Get the lengths of the input strings
     m = len(str1)
@@ -43,7 +56,7 @@ def ldistance(str1, str2):
                         "history": curr_row[j - 1]
                     },{
                         "distance": 1 + prev_row[j]["distance"],      # Remove
-                        "operation": ("Remove", str1[i - 1]),
+                        "operation": ("Delete", str1[i - 1]),
                         "history": prev_row[j]
                     }
                 ], key=lambda cell: cell["distance"])
@@ -122,7 +135,8 @@ def create_batch_from_string_pairs(string_pairs, embedding, pad_value=0.0):
     sequences = []
     lengths = []
     
-    for str1, str2 in string_pairs:
+    from tqdm import tqdm
+    for str1, str2 in tqdm(string_pairs):
         # Get the edit operations for this pair
         operations = ldistance(str1, str2)
         
@@ -166,43 +180,35 @@ import math
 from transformer_stuff import PositionalEncoding
 
 class LDistanceModel(nn.Module):
-    def __init__(self, vocab_size, embedding: nn.Embedding, hidden_dim=64):
+    def __init__(self, embedding: nn.Embedding, hidden_dim=64):
         super(LDistanceModel, self).__init__()
         self.embedding = embedding
 
-        dropout = .2
-        self.pos_encoder = PositionalEncoding(embedding.embedding_dim, dropout)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding.embedding_dim, dim_feedforward=hidden_dim, nhead=2, batch_first=True)
+        self.pos_encoder = PositionalEncoding(embedding.embedding_dim + 2, dropout=.2)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding.embedding_dim + 2, dim_feedforward=hidden_dim, nhead=2, batch_first=True, dropout=.1)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1, mask_check=True) #mask_check makes sure we're only masking off the padding
 
         self.fc = nn.Sequential(
-            nn.Linear(embedding.embedding_dim * 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
+            nn.Linear(embedding.embedding_dim + 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
             nn.ReLU(),
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
 
-        self.use_cosine_similarity = False
-        self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
-
-    def encode_word(self, operations):
+    def encode(self, operations, masks):
         # Debug: Print input shape
         #print(f"Input shape: {x.shape}")
         
         # Ensure operations is 2D: [batch_size, seq_len]
-        if x.dim() > 2:
+        if operations.dim() > 2:
             # If input has extra dimensions, squeeze them out
-            x = x.squeeze()
-            if x.dim() == 1:
-                x = x.unsqueeze(0)  # Add batch dim if we squeezed too much
-        elif x.dim() == 1:
-            x = x.unsqueeze(0)  # Add batch dimension if missing
+            operations = operations.squeeze()
+            if operations.dim() == 1:
+                operations = operations.unsqueeze(0)  # Add batch dim if we squeezed too much
+        elif operations.dim() == 1:
+            operations = operations.unsqueeze(0)  # Add batch dimension if missing
         
-        # x shape: [batch_size, seq_len]
-        x = self.embedding(x)  # [batch_size, seq_len, embedding_dim]
-        #print(f"After embedding shape: {x.shape}")
-        
-        pos_encoded_x = self.pos_encoder(x)  # [batch_size, seq_len, embedding_dim]
+        pos_encoded_x = self.pos_encoder(operations)  # [batch_size, seq_len, embedding_dim]
         #print(f"After pos encoding shape: {pos_encoded_x.shape}")
         
         encoded = self.transformer_encoder(pos_encoded_x)  # [batch_size, seq_len, embedding_dim]
@@ -214,22 +220,8 @@ class LDistanceModel(nn.Module):
         # Option 2: Use the last token (uncomment if preferred)
         # return encoded[-1]  # [batch_size, embedding_dim]
 
-    def forward(self, input1, input2):
-        enc1 = self.encode_word(input1)  # [batch_size, embedding_dim]
-        enc2 = self.encode_word(input2)  # [batch_size, embedding_dim]
-        
-        # Compute cosine similarity
-
-        #similarity = torch.norm(enc1 - enc2, dim=1)
-        #import random
-        #combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
-
-        if self.use_cosine_similarity:
-            similarity = self.cosine_similarity(enc1, enc2)
-            return torch.sigmoid(similarity)
-        
-        #similarity = torch.norm(enc1 - enc2, dim=1)
+    def forward(self, operations, masks):
+        encoding = self.encode(operations, masks)
         
         import random
-        combined = torch.cat([enc1, enc2] if random.choice([True, False]) else [enc2, enc1], dim=1)  # [batch_size, embedding_dim * 2]
-        return self.fc(combined)
+        return self.fc(encoding)
