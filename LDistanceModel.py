@@ -156,7 +156,7 @@ def create_batch_from_string_pairs(string_pairs, embedding, pad_value=0.0):
     
     return batched_tensor, lengths
 
-def create_batch_with_masks(string_pairs, embedding, pad_value=0.0):
+def create_batch_with_masks(string_pairs, embedding, device=torch.get_default_device(), pad_value=0.0):
     """
     Same as above but also returns attention masks for the sequences.
     
@@ -170,9 +170,11 @@ def create_batch_with_masks(string_pairs, embedding, pad_value=0.0):
     batch_size, max_seq_len = batched_tensor.shape[0], batched_tensor.shape[1]
     
     # Create attention masks (True for real tokens, False for padding)
-    attention_masks = torch.zeros(batch_size, max_seq_len, dtype=torch.bool)
+    attention_masks = torch.zeros(batch_size, max_seq_len, dtype=torch.bool, device=device)
     for i, length in enumerate(lengths):
         attention_masks[i, :length] = True
+    
+    torch.logical_not(attention_masks, out=attention_masks)
     
     return batched_tensor, attention_masks, lengths
 
@@ -180,13 +182,13 @@ import math
 from transformer_stuff import PositionalEncoding
 
 class LDistanceModel(nn.Module):
-    def __init__(self, embedding: nn.Embedding, hidden_dim=64):
+    def __init__(self, embedding: nn.Embedding, hidden_dim=64, nhead=2, num_layers=1):
         super(LDistanceModel, self).__init__()
         self.embedding = embedding
 
         self.pos_encoder = PositionalEncoding(embedding.embedding_dim + 2, dropout=.2)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding.embedding_dim + 2, dim_feedforward=hidden_dim, nhead=2, batch_first=True, dropout=.1)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1, mask_check=True) #mask_check makes sure we're only masking off the padding
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embedding.embedding_dim + 2, dim_feedforward=hidden_dim, nhead=nhead, batch_first=True, dropout=.1)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers, mask_check=True) #mask_check makes sure we're only masking off the padding
 
         self.fc = nn.Sequential(
             nn.Linear(embedding.embedding_dim + 2, 1),  # Changed from hidden_dim * 2 to embedding_dim * 2
@@ -200,19 +202,19 @@ class LDistanceModel(nn.Module):
         # Debug: Print input shape
         #print(f"Input shape: {x.shape}")
         
-        # Ensure operations is 2D: [batch_size, seq_len]
-        if operations.dim() > 2:
-            # If input has extra dimensions, squeeze them out
-            operations = operations.squeeze()
-            if operations.dim() == 1:
-                operations = operations.unsqueeze(0)  # Add batch dim if we squeezed too much
-        elif operations.dim() == 1:
-            operations = operations.unsqueeze(0)  # Add batch dimension if missing
+        # # Ensure operations is 2D: [batch_size, seq_len]
+        # if operations.dim() > 2:
+        #     # If input has extra dimensions, squeeze them out
+        #     operations = operations.squeeze()
+        #     if operations.dim() == 1:
+        #         operations = operations.unsqueeze(0)  # Add batch dim if we squeezed too much
+        # elif operations.dim() == 1:
+        #     operations = operations.unsqueeze(0)  # Add batch dimension if missing
         
         pos_encoded_x = self.pos_encoder(operations)  # [batch_size, seq_len, embedding_dim]
         #print(f"After pos encoding shape: {pos_encoded_x.shape}")
         
-        encoded = self.transformer_encoder(pos_encoded_x)  # [batch_size, seq_len, embedding_dim]
+        encoded = self.transformer_encoder(pos_encoded_x, src_key_padding_mask=masks)  # [batch_size, seq_len, embedding_dim]
         #print(f"After transformer shape: {encoded.shape}")
         
         # Option 1: Use mean pooling to get a fixed-size representation
