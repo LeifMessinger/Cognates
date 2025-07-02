@@ -61,10 +61,10 @@ def show_train_and_test_accuracy_over_epochs(history):
 	leg.legend_handles[0].set_color('orange')
 	leg.legend_handles[1].set_color('blue')
 
-	plt.xlabel('Epochs')
+	plt.xlabel('Timestamps')
 	plt.ylabel('Accuracy')
 	plt.xticks(np.arange(1, len(history["train"]), step=1))
-	plt.title('Training and Testing Accuracies Over Epochs')
+	plt.title('Training and Testing Accuracies Over Timestamps')
 	plt.show()
 
 from sklearn.metrics import roc_curve, auc
