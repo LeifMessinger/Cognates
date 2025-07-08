@@ -79,13 +79,14 @@ class TransformerCognateModel(nn.Module):
             x = x.unsqueeze(0)  # Add batch dimension if missing
             
         # x shape: [batch_size, seq_len]
+        src_key_padding_mask = (x == 0)
         x = self.embedding(x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After embedding shape: {x.shape}")
         
         pos_encoded_x = self.pos_encoder(x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After pos encoding shape: {pos_encoded_x.shape}")
         
-        encoded = self.transformer_encoder(pos_encoded_x)  # [batch_size, seq_len, embedding_dim]
+        encoded = self.transformer_encoder(pos_encoded_x, src_key_padding_mask=src_key_padding_mask)  # [batch_size, seq_len, embedding_dim]
         #print(f"After transformer shape: {encoded.shape}")
         
         # Option 1: Use mean pooling to get a fixed-size representation
