@@ -46,9 +46,8 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 class TransformerCognateModel(nn.Module):
-    def __init__(self, vocab_size, embedding_dim=64, hidden_dim=64):
+    def __init__(self, embedding_dim=64, hidden_dim=64):
         super(TransformerCognateModel, self).__init__()
-        self.embedding = nn.Embedding(vocab_size + 1, embedding_dim, padding_idx=0)
 
         dropout = .2
         self.pos_encoder = PositionalEncoding(embedding_dim, dropout)
@@ -65,7 +64,7 @@ class TransformerCognateModel(nn.Module):
         self.use_cosine_similarity = False
         self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
 
-    def encode_word(self, x):
+    def encode_word(self, x, mask):
         # Debug: Print input shape
         #print(f"Input shape: {x.shape}")
         
@@ -79,14 +78,11 @@ class TransformerCognateModel(nn.Module):
             x = x.unsqueeze(0)  # Add batch dimension if missing
             
         # x shape: [batch_size, seq_len]
-        src_key_padding_mask = (x == 0)
-        x = self.embedding(x)  # [batch_size, seq_len, embedding_dim]
-        #print(f"After embedding shape: {x.shape}")
         
         pos_encoded_x = self.pos_encoder(x)  # [batch_size, seq_len, embedding_dim]
         #print(f"After pos encoding shape: {pos_encoded_x.shape}")
         
-        encoded = self.transformer_encoder(pos_encoded_x, src_key_padding_mask=src_key_padding_mask)  # [batch_size, seq_len, embedding_dim]
+        encoded = self.transformer_encoder(pos_encoded_x, src_key_padding_mask=mask)  # [batch_size, seq_len, embedding_dim]
         #print(f"After transformer shape: {encoded.shape}")
         
         # Option 1: Use mean pooling to get a fixed-size representation
@@ -95,9 +91,9 @@ class TransformerCognateModel(nn.Module):
         # Option 2: Use the last token (uncomment if preferred)
         # return encoded[-1]  # [batch_size, embedding_dim]
 
-    def forward(self, input1, input2):
-        enc1 = self.encode_word(input1)  # [batch_size, embedding_dim]
-        enc2 = self.encode_word(input2)  # [batch_size, embedding_dim]
+    def forward(self, word_pair, word_pair_masks):
+        enc1 = self.encode_word(word_pair[:, 0, :, :], word_pair_masks[:, 0, :])  # [batch_size, embedding_dim]
+        enc2 = self.encode_word(word_pair[:, 1, :, :], word_pair_masks[:, 1, :])  # [batch_size, embedding_dim]
         
         # Compute cosine similarity
 
