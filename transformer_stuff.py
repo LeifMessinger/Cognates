@@ -46,8 +46,12 @@ class PositionalEncoding(nn.Module):
 		return self.dropout(x)
 
 class TransformerCognateModel(nn.Module):
-	def __init__(self, embedding_dim=64, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1):
+	def __init__(self, embedder, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1):
 		super(TransformerCognateModel, self).__init__()
+		
+		self.embedder = embedder
+		embedding_dim = embedder.embedding_dim
+		self.embedding_dim = embedding_dim
 
 		self.pos_encoder = PositionalEncoding(embedding_dim, positional_dropout)
 		encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=2, batch_first=True, dropout=dropout)
@@ -59,8 +63,6 @@ class TransformerCognateModel(nn.Module):
 			nn.Linear(64, 1),
 			nn.Sigmoid()
 		)
-		
-		self.kinda_embedding = nn.Linear(embedding_dim, embedding_dim)
 
 		self.use_cosine_similarity = False
 		self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
@@ -79,7 +81,7 @@ class TransformerCognateModel(nn.Module):
 			x = x.unsqueeze(0)  # Add batch dimension if missing
 			
 		# x shape: [batch_size, seq_len]
-		x = self.kinda_embedding(x)
+		x = self.embedder(x)
 		
 		pos_encoded_x = self.pos_encoder(x)  # [batch_size, seq_len, embedding_dim]
 		#print(f"After pos encoding shape: {pos_encoded_x.shape}")
@@ -94,8 +96,8 @@ class TransformerCognateModel(nn.Module):
 		# return encoded[-1]  # [batch_size, embedding_dim]
 
 	def forward(self, word_pair, word_pair_masks):
-		enc1 = self.encode_word(word_pair[:, 0, :, :], word_pair_masks[:, 0, :])  # [batch_size, embedding_dim]
-		enc2 = self.encode_word(word_pair[:, 1, :, :], word_pair_masks[:, 1, :])  # [batch_size, embedding_dim]
+		enc1 = self.encode_word(word_pair[:, 0, :], word_pair_masks[:, 0, :])  # [batch_size, embedding_dim]
+		enc2 = self.encode_word(word_pair[:, 1, :], word_pair_masks[:, 1, :])  # [batch_size, embedding_dim]
 		
 		# Compute cosine similarity
 
