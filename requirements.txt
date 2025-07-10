@@ -3,4 +3,5 @@ pandas
 tqdm
 scikit-learn
 matplotlib
+joblib
 ipywidgets
