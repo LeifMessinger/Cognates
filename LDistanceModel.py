@@ -136,7 +136,21 @@ def create_batch_from_string_pairs(string_pairs, embedding, pad_value=0.0):
     lengths = []
     
     from tqdm import tqdm
-    for str1, str2 in tqdm(string_pairs):
+    for str1, str2 in tqdm(string_pairs, desc="LDistance Word1, Word2"):
+        # Get the edit operations for this pair
+        operations = ldistance(str1, str2)
+        
+        # Convert operations to tensor sequence
+        if operations:  # Check if there are any operations
+            sequence_tensor = operation_encoder(operations, embedding)
+        else:
+            assert False, "This code should never be reached."
+        
+        sequences.append(sequence_tensor)
+        lengths.append(sequence_tensor.shape[0])
+    
+    from tqdm import tqdm
+    for str1, str2 in tqdm(string_pairs, desc="LDistance Word2, Word1"):
         # Get the edit operations for this pair
         operations = ldistance(str1, str2)
         
