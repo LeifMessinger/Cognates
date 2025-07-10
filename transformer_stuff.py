@@ -46,10 +46,10 @@ class PositionalEncoding(nn.Module):
 		return self.dropout(x)
 
 class TransformerCognateModel(nn.Module):
-	def __init__(self, embedding_dim=64, hidden_dim=64, dropout=0.2, layers=1):
+	def __init__(self, embedding_dim=64, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1):
 		super(TransformerCognateModel, self).__init__()
 
-		self.pos_encoder = PositionalEncoding(embedding_dim, .2)
+		self.pos_encoder = PositionalEncoding(embedding_dim, positional_dropout)
 		encoder_layer = nn.TransformerEncoderLayer(d_model=embedding_dim, dim_feedforward=hidden_dim, nhead=2, batch_first=True, dropout=dropout)
 		self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=layers) #I assume is_causal=False. It throws an error if I try to set it.
 
