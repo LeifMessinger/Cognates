@@ -46,7 +46,7 @@ class PositionalEncoding(nn.Module):
 		return self.dropout(x)
 
 class TransformerCognateModel(nn.Module):
-	def __init__(self, embedder, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1):
+	def __init__(self, embedder, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1, use_cosine_similarity=False):
 		super(TransformerCognateModel, self).__init__()
 		
 		self.embedder = embedder
@@ -64,7 +64,7 @@ class TransformerCognateModel(nn.Module):
 			nn.Sigmoid()
 		)
 
-		self.use_cosine_similarity = False
+		self.use_cosine_similarity = use_cosine_similarity
 		self.cosine_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
 
 	def encode_word(self, x, mask):
