@@ -23,14 +23,13 @@ def show_confusion_matrix(cm, title="Confusion Matrix"):
 
 	for (i, j), z in np.ndenumerate(cm):
 		ax.text(j, i, '{:0.1f}'.format(z), ha='center', va='center',
-				bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'))
+				bbox=dict(boxstyle='round', facecolor='white', edgecolor='0.3'),
+                fontsize=20)
 	
 	ax.set_xticks([0, 1])
 	ax.set_yticks([0, 1])   
 	ax.set_xticklabels(['Predicted Negative', 'Predicted Positive'])
 	ax.set_yticklabels(['True Negative', 'True Positive'])
-	plt.xlabel('Predicted')
-	plt.ylabel('True')
 	plt.title(title)
 	plt.savefig("test.svg", format="svg")
 	plt.savefig("confusion.svg")
