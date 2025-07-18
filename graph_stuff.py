@@ -147,6 +147,59 @@ def evaluate_clustering_accuracy(predicted_clusters, true_cognate_classes):
     accuracy = correct_pairs / total_pairs if total_pairs > 0 else 0
     return accuracy
 
+def evaluate_clustering_f1(predicted_clusters, true_cognate_classes):
+    """Evaluate clustering F1 score against ground truth cognate classes."""
+    # Create mapping from node index to predicted cluster
+    node_to_pred_cluster = {}
+    for cluster_id, cluster in enumerate(predicted_clusters):
+        for node in cluster:
+            node_to_pred_cluster[node] = cluster_id
+    
+    # Create mapping from node index to true cognate class
+    node_to_true_class = {}
+    for i, cognate_class in enumerate(true_cognate_classes):
+        node_to_true_class[i] = cognate_class
+    
+    # Create lists for true labels and predicted labels
+    true_labels = []
+    pred_labels = []
+    
+    n_nodes = len(true_cognate_classes)
+    for i in range(n_nodes):
+        for j in range(i+1, n_nodes):
+            # Check if they should be in same cluster (same cognate class)
+            should_be_together = (node_to_true_class[i] == node_to_true_class[j])
+            true_labels.append(should_be_together)
+            
+            # Check if they are in same predicted cluster
+            are_together = (node_to_pred_cluster[i] == node_to_pred_cluster[j])
+            pred_labels.append(are_together)
+    
+    # Calculate precision, recall, and F1 score
+    from sklearn.metrics import precision_score, recall_score, f1_score
+    # precision = precision_score(true_labels, pred_labels)
+    # recall = recall_score(true_labels, pred_labels)
+    f1 = f1_score(true_labels, pred_labels)
+    
+    return f1
+
+def evaluate_clustering_nmi(predicted_clusters, true_cognate_classes):
+    """Evaluate clustering NMI against ground truth cognate classes."""
+    # Create mapping from node index to predicted cluster
+    node_to_pred_cluster = {}
+    for cluster_id, cluster in enumerate(predicted_clusters):
+        for node in cluster:
+            node_to_pred_cluster[node] = cluster_id
+    
+    # Create list for predicted labels
+    pred_labels = [node_to_pred_cluster[i] for i in range(len(true_cognate_classes))]
+    
+    # Calculate NMI
+    from sklearn.metrics import normalized_mutual_info_score
+    nmi = normalized_mutual_info_score(true_cognate_classes, pred_labels)
+    
+    return nmi
+
 def extract_cognate_class(cc_string):
     """Extract cognate class from cc field (e.g., 'few:I' -> 'I')."""
     if pd.isna(cc_string):
@@ -206,12 +259,16 @@ def evaluate_clusters(predicted_clusters, cognate_class_label_array, meaning):
         Dict with evaluation metrics
     """
     accuracy = evaluate_clustering_accuracy(predicted_clusters, cognate_class_label_array)
+    f1 = evaluate_clustering_f1(predicted_clusters, cognate_class_label_array)
+    nmi = evaluate_clustering_nmi(predicted_clusters, cognate_class_label_array)
     
     results = {
         'meaning': meaning,
         'predicted_clusters': predicted_clusters,
         'true_classes': cognate_class_label_array,
         'accuracy': accuracy,
+        'f1': f1,
+        'nmi': nmi,
         'num_words': len(cognate_class_label_array),
         'num_predicted_clusters': len(predicted_clusters),
         'num_true_classes': len(set(cognate_class_label_array))
