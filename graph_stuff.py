@@ -120,7 +120,7 @@ def find_best_clustering(adj_matrix, conductance_weight=0.5, density_weight=0.5)
     clusters = []
     
     while len(available_nodes) > 1:
-        max_cluster_size = len(available_nodes) // 2
+        max_cluster_size = len(available_nodes) // 4
         if max_cluster_size < 2:
             break
         
@@ -131,7 +131,8 @@ def find_best_clustering(adj_matrix, conductance_weight=0.5, density_weight=0.5)
         best_score = -1
         
         # Find best cluster
-        for cluster in possible_clusters:
+        from tqdm import tqdm
+        for cluster in tqdm(possible_clusters, desc="Possible clusters"):
             score = score_cluster(cluster, adj_matrix, conductance_weight, density_weight)
             if score > best_score:
                 best_score = score
@@ -265,7 +266,7 @@ def cluster_grouping(word_array, model, device='cpu'):
                 # Fill both triangles of the matrix
                 adj_matrix[i, j] = similarity
                 adj_matrix[j, i] = similarity
-    
+
     # Find best clustering
     predicted_clusters = find_best_clustering(adj_matrix)
     
@@ -305,7 +306,8 @@ def cluster_and_evaluate_all_meanings(df, model, ipa_to_ids, device='cpu'):
     results = {}
     
     # Step 2 & 3: Clustering and Evaluation
-    for meaning, (word_array, cognate_class_label_array) in groupings.items():
+    from tqdm import tqdm
+    for meaning, (word_array, cognate_class_label_array) in tqdm(groupings.items(), total=len(groupings)):
         print(f"\nProcessing meaning: {meaning}")
         print(f"Number of words: {len(word_array)}")
         
@@ -338,7 +340,8 @@ def main():
     print(f"Created {len(groupings)} meaning groups")
     
     # Example of using the modular approach:
-    model = torch.load('TransformerCognateModel_34.pt')
+    from transformer_stuff import TransformerCognateModel
+    model = torch.load('TransformerCognateModel_34.pt', weights_only=False)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     
