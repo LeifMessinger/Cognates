@@ -12,7 +12,7 @@ def show_box_plot(data, title="Cross Validation Accuracies"):
 
 	# Add title and labels
 	plt.title(title)
-	plt.ylabel('Values')
+	plt.yticks([])  # Removes all y-ticks and their labels
 
 	# Show the plot
 	plt.show()
