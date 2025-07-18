@@ -113,44 +113,6 @@ def generate_all_clusters(available_nodes, max_size):
             clusters.append(list(cluster))
     return clusters
 
-def find_best_clustering(adj_matrix, conductance_weight=0.5, density_weight=0.5):
-    """Find the best clustering using greedy approach."""
-    n_nodes = adj_matrix.shape[0]
-    available_nodes = list(range(n_nodes))
-    clusters = []
-    
-    while len(available_nodes) > 1:
-        max_cluster_size = len(available_nodes) // 4
-        if max_cluster_size < 2:
-            break
-        
-        # Generate all possible clusters
-        possible_clusters = generate_all_clusters(available_nodes, max_cluster_size)
-        
-        best_cluster = None
-        best_score = -1
-        
-        # Find best cluster
-        from tqdm import tqdm
-        for cluster in tqdm(possible_clusters, desc="Possible clusters"):
-            score = score_cluster(cluster, adj_matrix, conductance_weight, density_weight)
-            if score > best_score:
-                best_score = score
-                best_cluster = cluster
-        
-        if best_cluster is None or best_score <= 0:
-            break
-        
-        # Add best cluster and remove its nodes from available
-        clusters.append(best_cluster)
-        available_nodes = [node for node in available_nodes if node not in best_cluster]
-    
-    # Add remaining nodes as singleton clusters
-    for node in available_nodes:
-        clusters.append([node])
-    
-    return clusters
-
 def evaluate_clustering_accuracy(predicted_clusters, true_cognate_classes):
     """Evaluate clustering accuracy against ground truth cognate classes."""
     # Create mapping from node index to predicted cluster
@@ -231,47 +193,6 @@ def create_groupings(df, ipa_to_ids):
     
     return groupings
 
-def cluster_grouping(word_array, model, device='cpu'):
-    """
-    Cluster a group of words using the model to create adjacency matrix.
-    
-    Args:
-        word_array: List of tensors representing IPA words
-        model: Trained transformer model
-        device: Device to run model on
-    
-    Returns:
-        List of clusters, where each cluster is a list of indices
-    """
-    n_words = len(word_array)
-    
-    # Create adjacency matrix
-    adj_matrix = torch.zeros((n_words, n_words))
-    
-    model.eval()
-    with torch.no_grad():
-        for i in range(n_words):
-            for j in range(i+1, n_words):
-                # Create word pair tensor
-                word_pair = torch.stack([word_array[i], word_array[j]], dim=0).unsqueeze(0).to(device)
-                
-                # Create masks (True for padding tokens)
-                mask1 = (word_array[i] == 0).unsqueeze(0).to(device)
-                mask2 = (word_array[j] == 0).unsqueeze(0).to(device)
-                word_pair_masks = torch.stack([mask1, mask2], dim=1).to(device)
-                
-                # Get similarity score
-                similarity = model(word_pair, word_pair_masks).item()
-                
-                # Fill both triangles of the matrix
-                adj_matrix[i, j] = similarity
-                adj_matrix[j, i] = similarity
-
-    # Find best clustering
-    predicted_clusters = find_best_clustering(adj_matrix)
-    
-    return predicted_clusters
-
 def evaluate_clusters(predicted_clusters, cognate_class_label_array, meaning):
     """
     Evaluate clustering accuracy against ground truth cognate classes.
@@ -298,65 +219,5 @@ def evaluate_clusters(predicted_clusters, cognate_class_label_array, meaning):
     
     return results
 
-def cluster_and_evaluate_all_meanings(df, model, ipa_to_ids, device='cpu'):
-    """Process all word meanings and evaluate clustering using the modular approach."""
-    # Step 1: Preprocessing
-    groupings = create_groupings(df, ipa_to_ids)
-    
-    results = {}
-    
-    # Step 2 & 3: Clustering and Evaluation
-    from tqdm import tqdm
-    for meaning, (word_array, cognate_class_label_array) in tqdm(groupings.items(), total=len(groupings)):
-        print(f"\nProcessing meaning: {meaning}")
-        print(f"Number of words: {len(word_array)}")
-        
-        # Step 2: Clustering
-        predicted_clusters = cluster_grouping(word_array, model, device)
-        
-        # Step 3: Evaluation
-        evaluation_results = evaluate_clusters(predicted_clusters, cognate_class_label_array, meaning)
-        
-        results[meaning] = evaluation_results
-        
-        print(f"Predicted clusters: {predicted_clusters}")
-        print(f"True classes: {cognate_class_label_array}")
-        print(f"Accuracy: {evaluation_results['accuracy']:.3f}")
-    
-    return results
 
-# Example usage:
-def main():
-    # Load data
-    df = pd.read_csv('data/ielexData.csv')
-    
-    # Create IPA to ID mapping
-    import joblib
-    ipa_embedder = joblib.load("data/embeddings/34.joblib")
-    ipa_to_ids = ipa_embedder.char_to_idx
-    
-    # Step 1: Preprocessing
-    groupings = create_groupings(df, ipa_to_ids)
-    print(f"Created {len(groupings)} meaning groups")
-    
-    # Example of using the modular approach:
-    from transformer_stuff import TransformerCognateModel
-    model = torch.load('TransformerCognateModel_34.pt', weights_only=False)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    
-    # Process a single meaning group
-    # meaning = 'few'
-    # if meaning in groupings:
-    #     word_array, cognate_labels = groupings[meaning]
-    #     clusters = cluster_grouping(word_array, model, device)
-    #     results = evaluate_clusters(clusters, cognate_labels, meaning)
-    #     print(f"Results for '{meaning}': {results}")
-    
-    # Or process all meanings
-    all_results = cluster_and_evaluate_all_meanings(df, model, ipa_to_ids, device)
-    accuracies = [r['accuracy'] for r in all_results.values()]
-    print(f"\nOverall average accuracy: {np.mean(accuracies):.3f}")
-    
-if __name__ == "__main__":
-    main()
+
