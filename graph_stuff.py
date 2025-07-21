@@ -219,7 +219,7 @@ def create_groupings(df, ipa_to_ids):
         where word_array is list of tensors and cognate_class_label_array is list of cognate classes
     """
     # Filter to only relevant columns
-    filtered_df = df[['Meaning', 'Phonological Form', 'cc']].copy()
+    filtered_df = df[['Language', 'Meaning', 'Phonological Form', 'cc']].copy()
     
     # Remove rows with missing data
     filtered_df = filtered_df.dropna()
@@ -234,6 +234,9 @@ def create_groupings(df, ipa_to_ids):
             continue  # Skip meanings with fewer than 2 words
         
         # Convert IPA words to tensors
+        languages = group['Language'].tolist()
+        phonological_words = group['Phonological Form'].tolist()
+        labels = [language + ': ' + word for language, word in zip(languages, phonological_words)]
         word_array = []
         for ipa_word in group['Phonological Form']:
             tensor = ipa_to_tensor(ipa_word, ipa_to_ids)
@@ -242,7 +245,7 @@ def create_groupings(df, ipa_to_ids):
         # Extract cognate class labels
         cognate_class_label_array = [extract_cognate_class(cc) for cc in group['cc']]
         
-        groupings[meaning] = (word_array, cognate_class_label_array)
+        groupings[meaning] = (word_array, cognate_class_label_array, labels, meaning)
     
     return groupings
 
