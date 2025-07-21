@@ -275,6 +275,3 @@ def evaluate_clusters(predicted_clusters, cognate_class_label_array, meaning):
     }
     
     return results
-
-
-
