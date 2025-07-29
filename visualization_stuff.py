@@ -130,6 +130,9 @@ def show_multiple_roc_curves(history, title="ROC Curves - Last Epoch by Fold", d
     plt.tight_layout()
     plt.xlim([0, 1])
     plt.ylim([0, 1])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(title)
     plt.show()
 
 def show_roc_curves_over_epochs(history, title="ROC"):
