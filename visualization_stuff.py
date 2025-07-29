@@ -178,7 +178,7 @@ def show_roc_curves_over_epochs(history, title="ROC"):
     leg.legend_handles[0].set_color('orange')
     leg.legend_handles[1].set_color('blue')
     
-    plt.xlabel('Epochs')
+    plt.xlabel('Timestamps')
     plt.ylabel('ROC AUC')
     plt.xticks(np.arange(0, num_epochs, step=1))
     plt.title(title)
