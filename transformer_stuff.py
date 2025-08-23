@@ -60,8 +60,8 @@ class TransformerCognateModel(nn.Module):
 		self.fc = nn.Sequential(
 			nn.Linear(embedding_dim * 2, 64),  # Changed from hidden_dim * 2 to embedding_dim * 2
 			nn.ReLU(),
-			nn.Linear(64, 1),
-			nn.Sigmoid()
+			nn.Linear(64, 1)#,
+			#nn.Sigmoid()
 		)
 
 		self.use_cosine_similarity = False
