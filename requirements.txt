@@ -6,3 +6,6 @@ matplotlib
 joblib
 ipywidgets
 scipy
+
+torchao
+torchtune
