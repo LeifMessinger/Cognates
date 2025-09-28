@@ -8,29 +8,6 @@ import torch.nn as nn
 import math
 from torch import Tensor
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        position = torch.arange(max_len).unsqueeze(1)  # [max_len, 1]
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))  # [d_model/2]
-
-        pe = torch.zeros(max_len, d_model)  # [max_len, d_model]
-        pe[:, 0::2] = torch.sin(position * div_term)  # even indices
-        pe[:, 1::2] = torch.cos(position * div_term)  # odd indices
-
-        pe = pe.unsqueeze(0)  # [1, max_len, d_model] for broadcasting over batch
-        self.register_buffer('pe', pe)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Arguments:
-            x: Tensor, shape ``[batch_size, seq_len, embedding_dim]``
-        """
-        x = x + self.pe[:, :x.size(1), :]
-        return self.dropout(x)
-
 class CognateEncoder(nn.Module):
     """Base encoder for cognate words"""
     def __init__(self, embedder, hidden_dim=64, positional_dropout=0.2, dropout=0.0, layers=1, output_dim=128):
@@ -39,60 +16,52 @@ class CognateEncoder(nn.Module):
         self.embedder = embedder
         embedding_dim = embedder.embedding_dim
         self.embedding_dim = embedding_dim
-
-        self.pos_encoder = PositionalEncoding(embedding_dim, positional_dropout)
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=embedding_dim, 
-            dim_feedforward=hidden_dim, 
-            nhead=2, 
-            batch_first=True, 
-            dropout=dropout
-        )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=layers)
         
-        # Projection head to map to output dimension
-        self.projection = nn.Sequential(
-            nn.Linear(embedding_dim, hidden_dim),
+        # Enhanced convolutional block with skip connections and more layers
+        self.conv = nn.Sequential(
+            nn.Conv1d(embedding_dim, hidden_dim, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim)
+            nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveMaxPool1d(1)
         )
 
-    def encode_word(self, x, mask):
-        # Ensure x is 2D: [batch_size, seq_len]
-        if x.dim() > 2:
-            x = x.squeeze()
-            if x.dim() == 1:
-                x = x.unsqueeze(0)
-        elif x.dim() == 1:
-            x = x.unsqueeze(0)
-            
-        # x shape: [batch_size, seq_len]
-        x = self.embedder(x)
-        pos_encoded_x = self.pos_encoder(x)
-        encoded = self.transformer_encoder(pos_encoded_x, src_key_padding_mask=mask)
-        
-        # Use mean pooling to get fixed-size representation
-        pooled = encoded.mean(dim=1)  # [batch_size, embedding_dim]
-        
-        # Project to output dimension
-        return self.projection(pooled)  # [batch_size, output_dim]
+        self.projection = nn.Linear(hidden_dim, output_dim)
 
-    def forward(self, batch_word_characters, batch_word_characters_masks):
-        assert batch_word_characters.dim() == 3, "Input must be of shape [batch_size, num_words, seq_len]"
-        assert batch_word_characters.shape == batch_word_characters_masks.shape, "Characters and masks must have same shape"
-        
-        device = batch_word_characters.device
-        
-        batch_size, num_words, seq_len = batch_word_characters.shape
-        output_dim = self.projection[-1].out_features
+    def _conv_with_skip(self, emb):
+        # emb: [batch_size, embedding_dim, seq_len]
+        x = emb
+        out1 = self.conv[0](x)
+        out1 = self.conv[1](out1)
+        out2 = self.conv[2](out1)
+        out2 = self.conv[3](out2)
+        skip1 = out2 + out1  # First skip connection
+        out3 = self.conv[4](skip1)
+        out3 = self.conv[5](out3)
+        skip2 = out3 + skip1  # Second skip connection
+        out4 = self.conv[6](skip2)
+        out4 = self.conv[7](out4)
+        out = self.conv[8](out4)
+        return out
 
-        all_embeddings = torch.zeros(batch_size, num_words, output_dim, device=device, dtype=torch.float)
-        for i in range(batch_size):
-            all_embeddings[i] = self.encode_word(
-            batch_word_characters[i], batch_word_characters_masks[i]
-            )
+    def encode_words(self, x, mask):
+        """
+        x: [batch_size, seq_len] (indices of letters)
+        mask: [batch_size, seq_len] (bool mask, True for padding)
+        """
+        assert x.dim() == 2, "Input x must be of shape [batch_size, seq_len]"
+        emb = self.embedder(x)  # [batch_size, seq_len, embedding_dim]
+        emb = emb.transpose(1, 2)  # [batch_size, embedding_dim, seq_len]
+        conv_out = self.conv(emb).squeeze(-1)  # [batch_size, hidden_dim]
+        out = self.projection(conv_out)  # [batch_size, output_dim]
+        return F.normalize(out, dim=1)
 
-        return all_embeddings
+    def forward(self, x, mask):
+        return torch.vmap(self.encode_words, in_dims=(0, 0))(x, mask)
 
 # Stolen from https://github.com/tufts-ml/SupContrast/blob/master/revised_losses.py
 class SINCERELoss(nn.Module):
